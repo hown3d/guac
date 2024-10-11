@@ -45,8 +45,15 @@ type Metadata struct {
 // Result defines the Vulnerability ID and its alias. There can be multiple
 // results per artifact
 type Result struct {
-	VulnerabilityId string   `json:"vulnerability_id,omitempty"`
-	Aliases         []string `json:"aliases,omitempty"`
+	VulnerabilityId string     `json:"vulnerability_id,omitempty"`
+	Aliases         []string   `json:"aliases,omitempty"`
+	Severity        []Severity `json:"severity,omitempty"`
+}
+
+// Severity describes the severity of a vulnerability using one or more quantitative scoring method.
+type Severity struct {
+	Method string `json:"method,omitempty"`
+	Score  string `json:"severity,omitempty"`
 }
 
 // DB defines the scanner database used at the time of scan
