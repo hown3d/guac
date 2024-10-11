@@ -48,6 +48,7 @@ type scorecardOptions struct {
 	interval                time.Duration
 	csubClientOptions       csub_client.CsubClientOptions
 	queryVulnOnIngestion    bool
+	addVulnMetadata         bool
 	queryLicenseOnIngestion bool
 	// sets artificial latency on the certifier (default to nil)
 	addedLatency *time.Duration
@@ -71,6 +72,7 @@ var scorecardCmd = &cobra.Command{
 			viper.GetBool("add-license-on-ingest"),
 			viper.GetString("certifier-latency"),
 			viper.GetInt("certifier-batch-size"),
+			viper.GetBool("add-vuln-metadata"),
 		)
 		if err != nil {
 			fmt.Printf("unable to validate flags: %v\n", err)
@@ -104,7 +106,6 @@ var scorecardCmd = &cobra.Command{
 
 		// running and getting the scorecard checks
 		scorecardCertifier, err := scorecard.NewScorecardCertifier(scorecardRunner)
-
 		if err != nil {
 			fmt.Printf("unable to create scorecard certifier: %v\n", err)
 			_ = cmd.Help()
@@ -113,7 +114,6 @@ var scorecardCmd = &cobra.Command{
 
 		// scorecard certifier is the certifier that gets the scorecard data graphQL
 		query, err := sc.NewCertifier(gqlclient, opts.batchSize, opts.addedLatency)
-
 		if err != nil {
 			fmt.Printf("unable to create scorecard certifier: %v\n", err)
 			_ = cmd.Help()
@@ -132,8 +132,7 @@ var scorecardCmd = &cobra.Command{
 		// Set emit function to go through the entire pipeline
 		emit := func(d *processor.Document) error {
 			totalNum += 1
-			_, err := ingestor.Ingest(ctx, d, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
-
+			_, err := ingestor.Ingest(ctx, d, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 			if err != nil {
 				return fmt.Errorf("unable to ingest document: %v", err)
 			}
@@ -192,6 +191,7 @@ func validateScorecardFlags(
 	queryLicenseIngestion bool,
 	certifierLatencyStr string,
 	batchSize int,
+	addVulnMetadata bool,
 ) (scorecardOptions, error) {
 	var opts scorecardOptions
 	opts.graphqlEndpoint = graphqlEndpoint
@@ -223,12 +223,15 @@ func validateScorecardFlags(
 	opts.interval = i
 	opts.queryVulnOnIngestion = queryVulnIngestion
 	opts.queryLicenseOnIngestion = queryLicenseIngestion
+	opts.addVulnMetadata = addVulnMetadata
 	return opts, nil
 }
 
 func init() {
-	set, err := cli.BuildFlags([]string{"certifier-latency",
-		"certifier-batch-size"})
+	set, err := cli.BuildFlags([]string{
+		"certifier-latency",
+		"certifier-batch-size",
+	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to setup flag: %v", err)
 		os.Exit(1)

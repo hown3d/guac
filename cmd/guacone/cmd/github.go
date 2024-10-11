@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
@@ -29,8 +30,6 @@ import (
 	"github.com/guacsec/guac/pkg/collectsub/datasource/csubsource"
 	"github.com/guacsec/guac/pkg/handler/processor"
 	"github.com/guacsec/guac/pkg/ingestor"
-
-	"os/signal"
 
 	"github.com/guacsec/guac/internal/client/githubclient"
 	csub_client "github.com/guacsec/guac/pkg/collectsub/client"
@@ -69,6 +68,7 @@ type githubOptions struct {
 	headerFile              string
 	queryVulnOnIngestion    bool
 	queryLicenseOnIngestion bool
+	addVulnMetadata         bool
 }
 
 var githubCmd = &cobra.Command{
@@ -91,6 +91,7 @@ var githubCmd = &cobra.Command{
 			viper.GetBool("poll"),
 			viper.GetBool("add-vuln-on-ingest"),
 			viper.GetBool("add-license-on-ingest"),
+			viper.GetBool("add-vuln-metadata"),
 			args)
 		if err != nil {
 			fmt.Printf("unable to validate flags: %v\n", err)
@@ -155,8 +156,7 @@ var githubCmd = &cobra.Command{
 		var errFound bool
 
 		emit := func(d *processor.Document) error {
-			_, err := ingestor.Ingest(ctx, d, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
-
+			_, err := ingestor.Ingest(ctx, d, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 			if err != nil {
 				errFound = true
 				return fmt.Errorf("unable to ingest document: %w", err)
@@ -209,7 +209,8 @@ var githubCmd = &cobra.Command{
 }
 
 func validateGithubFlags(graphqlEndpoint, headerFile, githubMode, sbomName, workflowFileName, csubAddr string, csubTls,
-	csubTlsSkipVerify, useCsub, poll bool, queryVulnIngestion bool, queryLicenseIngestion bool, args []string) (githubOptions, error) {
+	csubTlsSkipVerify, useCsub, poll bool, queryVulnIngestion bool, queryLicenseIngestion bool, addVulnMetadata bool, args []string,
+) (githubOptions, error) {
 	var opts githubOptions
 	opts.graphqlEndpoint = graphqlEndpoint
 	opts.headerFile = headerFile
@@ -219,6 +220,7 @@ func validateGithubFlags(graphqlEndpoint, headerFile, githubMode, sbomName, work
 	opts.workflowFileName = workflowFileName
 	opts.queryVulnOnIngestion = queryVulnIngestion
 	opts.queryLicenseOnIngestion = queryLicenseIngestion
+	opts.addVulnMetadata = addVulnMetadata
 
 	if useCsub {
 		csubOpts, err := csub_client.ValidateCsubClientFlags(csubAddr, csubTls, csubTlsSkipVerify)

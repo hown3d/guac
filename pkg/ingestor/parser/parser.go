@@ -49,9 +49,7 @@ func init() {
 	_ = RegisterDocumentParser(open_vex.NewOpenVEXParser, processor.DocumentOpenVEX)
 }
 
-var (
-	documentParser = map[processor.DocumentType]func() common.DocumentParser{}
-)
+var documentParser = map[processor.DocumentType]func() common.DocumentParser{}
 
 type docTreeBuilder struct {
 	identities    []common.TrustInformation
@@ -75,7 +73,7 @@ func RegisterDocumentParser(p func() common.DocumentParser, d processor.Document
 }
 
 // ParseDocumentTree takes the DocumentTree and create graph inputs (nodes and edges) per document node.
-func ParseDocumentTree(ctx context.Context, docTree processor.DocumentTree, scanForVulns bool, scanForLicense bool) ([]assembler.IngestPredicates, []*common.IdentifierStrings, error) {
+func ParseDocumentTree(ctx context.Context, docTree processor.DocumentTree, scanForVulns bool, scanForLicense bool, addVulnMetadata bool) ([]assembler.IngestPredicates, []*common.IdentifierStrings, error) {
 	var wg sync.WaitGroup
 
 	assemblerInputs := []assembler.IngestPredicates{}

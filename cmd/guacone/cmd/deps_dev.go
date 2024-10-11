@@ -51,6 +51,7 @@ type depsDevOptions struct {
 	graphqlEndpoint         string
 	headerFile              string
 	queryVulnOnIngestion    bool
+	addVulnMetadata         bool
 	queryLicenseOnIngestion bool
 	// sets artificial latency on the deps.dev collector (default to nil)
 	addedLatency *time.Duration
@@ -87,7 +88,7 @@ var depsDevCmd = &cobra.Command{
 		emit := func(d *processor.Document) error {
 			totalNum += 1
 
-			if _, err := ingestor.Ingest(ctx, d, opts.graphqlEndpoint, transport, csc, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion); err != nil {
+			if _, err := ingestor.Ingest(ctx, d, opts.graphqlEndpoint, transport, csc, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata); err != nil {
 				gotErr = true
 				return fmt.Errorf("unable to ingest document: %w", err)
 			}
@@ -144,6 +145,7 @@ func validateDepsDevFlags(args []string) (*depsDevOptions, client.Client, error)
 		graphqlEndpoint:         viper.GetString("gql-addr"),
 		headerFile:              viper.GetString("header-file"),
 		queryVulnOnIngestion:    viper.GetBool("add-vuln-on-ingest"),
+		addVulnMetadata:         viper.GetBool("add-vuln-metadata"),
 		queryLicenseOnIngestion: viper.GetBool("add-license-on-ingest"),
 	}
 

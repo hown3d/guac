@@ -60,6 +60,8 @@ type osvOptions struct {
 	// last time the scan was done in hours, if not set it will return
 	// all packages to check
 	lastScan *int
+	// addVulnMetadata enriches vulnerabilities with metadata during fetch
+	addVulnMetadata bool
 }
 
 var osvCmd = &cobra.Command{
@@ -79,6 +81,7 @@ var osvCmd = &cobra.Command{
 			viper.GetString("certifier-latency"),
 			viper.GetInt("certifier-batch-size"),
 			viper.GetInt("last-scan"),
+			viper.GetBool("add-vuln-metadata"),
 		)
 		if err != nil {
 			fmt.Printf("unable to validate flags: %v\n", err)
@@ -90,7 +93,13 @@ var osvCmd = &cobra.Command{
 		logger := logging.FromContext(ctx)
 		transport := cli.HTTPHeaderTransport(ctx, opts.headerFile, http.DefaultTransport)
 
-		if err := certify.RegisterCertifier(osv.NewOSVCertificationParser, certifier.CertifierOSV); err != nil {
+		if err := certify.RegisterCertifier(func() certifier.Certifier {
+			certifierOpts := []osv.CertifierOpts{}
+			if opts.addVulnMetadata {
+				certifierOpts = append(certifierOpts, osv.WithVulnerabilityMetadata())
+			}
+			return osv.NewOSVCertificationParser(certifierOpts...)
+		}, certifier.CertifierOSV); err != nil {
 			logger.Fatalf("unable to register certifier: %v", err)
 		}
 
@@ -125,7 +134,7 @@ var osvCmd = &cobra.Command{
 				case <-ticker.C:
 					if len(totalDocs) > 0 {
 						err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient,
-							opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
+							opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 						if err != nil {
 							stop = true
 							atomic.StoreInt32(&gotErr, 1)
@@ -139,7 +148,7 @@ var osvCmd = &cobra.Command{
 					totalDocs = append(totalDocs, d)
 					if len(totalDocs) >= threshold {
 						err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient,
-							opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
+							opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 						if err != nil {
 							stop = true
 							atomic.StoreInt32(&gotErr, 1)
@@ -158,7 +167,7 @@ var osvCmd = &cobra.Command{
 				totalNum += 1
 				totalDocs = append(totalDocs, <-docChan)
 				if len(totalDocs) >= threshold {
-					err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
+					err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 					if err != nil {
 						atomic.StoreInt32(&gotErr, 1)
 						logger.Errorf("unable to ingest documents: %v", err)
@@ -167,7 +176,7 @@ var osvCmd = &cobra.Command{
 				}
 			}
 			if len(totalDocs) > 0 {
-				err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
+				err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 				if err != nil {
 					atomic.StoreInt32(&gotErr, 1)
 					logger.Errorf("unable to ingest documents: %v", err)
@@ -237,6 +246,7 @@ func validateOSVFlags(
 	queryLicenseIngestion bool,
 	certifierLatencyStr string,
 	batchSize int, lastScan int,
+	addVulnMetadata bool,
 ) (osvOptions, error) {
 	var opts osvOptions
 	opts.graphqlEndpoint = graphqlEndpoint
@@ -271,13 +281,16 @@ func validateOSVFlags(
 	opts.csubClientOptions = csubOpts
 	opts.queryVulnOnIngestion = queryVulnIngestion
 	opts.queryLicenseOnIngestion = queryLicenseIngestion
+	opts.addVulnMetadata = addVulnMetadata
 
 	return opts, nil
 }
 
 func init() {
-	set, err := cli.BuildFlags([]string{"certifier-latency",
-		"certifier-batch-size", "last-scan"})
+	set, err := cli.BuildFlags([]string{
+		"certifier-latency",
+		"certifier-batch-size", "last-scan",
+	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to setup flag: %v", err)
 		os.Exit(1)

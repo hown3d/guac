@@ -52,6 +52,7 @@ type fileOptions struct {
 	// csub client options for identifier strings
 	csubClientOptions       csub_client.CsubClientOptions
 	queryVulnOnIngestion    bool
+	addVulnMetadata         bool
 	queryLicenseOnIngestion bool
 }
 
@@ -69,6 +70,7 @@ var filesCmd = &cobra.Command{
 			viper.GetBool("csub-tls-skip-verify"),
 			viper.GetBool("add-vuln-on-ingest"),
 			viper.GetBool("add-license-on-ingest"),
+			viper.GetBool("add-vuln-metadata"),
 			args)
 		if err != nil {
 			fmt.Printf("unable to validate flags: %v\n", err)
@@ -129,7 +131,7 @@ var filesCmd = &cobra.Command{
 
 		emit := func(d *processor.Document) error {
 			totalNum += 1
-			if _, err := ingestor.Ingest(ctx, d, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion); err != nil {
+			if _, err := ingestor.Ingest(ctx, d, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata); err != nil {
 				gotErr = true
 				filesWithErrors = append(filesWithErrors, d.SourceInformation.Source)
 				return fmt.Errorf("unable to ingest document: %w", err)
@@ -162,7 +164,8 @@ var filesCmd = &cobra.Command{
 }
 
 func validateFilesFlags(keyPath, keyID, graphqlEndpoint, headerFile, csubAddr string, csubTls, csubTlsSkipVerify bool,
-	queryVulnIngestion bool, queryLicenseIngestion bool, args []string) (fileOptions, error) {
+	queryVulnIngestion bool, queryLicenseIngestion bool, addVulnMetadata bool, args []string,
+) (fileOptions, error) {
 	var opts fileOptions
 	opts.graphqlEndpoint = graphqlEndpoint
 	opts.headerFile = headerFile
@@ -190,6 +193,7 @@ func validateFilesFlags(keyPath, keyID, graphqlEndpoint, headerFile, csubAddr st
 	opts.path = args[0]
 	opts.queryVulnOnIngestion = queryVulnIngestion
 	opts.queryLicenseOnIngestion = queryLicenseIngestion
+	opts.addVulnMetadata = addVulnMetadata
 	return opts, nil
 }
 

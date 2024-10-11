@@ -52,6 +52,7 @@ type cdOptions struct {
 	csubClientOptions       csub_client.CsubClientOptions
 	interval                time.Duration
 	queryVulnOnIngestion    bool
+	addVulnMetadata         bool
 	queryLicenseOnIngestion bool
 	// sets artificial latency on the certifier (default to nil)
 	addedLatency *time.Duration
@@ -79,6 +80,7 @@ var cdCmd = &cobra.Command{
 			viper.GetString("certifier-latency"),
 			viper.GetInt("certifier-batch-size"),
 			viper.GetInt("last-scan"),
+			viper.GetBool("add-vuln-metadata"),
 		)
 		if err != nil {
 			fmt.Printf("unable to validate flags: %v\n", err)
@@ -125,7 +127,7 @@ var cdCmd = &cobra.Command{
 				case <-ticker.C:
 					if len(totalDocs) > 0 {
 						err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient,
-							opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
+							opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 						if err != nil {
 							stop = true
 							atomic.StoreInt32(&gotErr, 1)
@@ -139,7 +141,7 @@ var cdCmd = &cobra.Command{
 					totalDocs = append(totalDocs, d)
 					if len(totalDocs) >= threshold {
 						err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient,
-							opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
+							opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 						if err != nil {
 							stop = true
 							atomic.StoreInt32(&gotErr, 1)
@@ -158,7 +160,7 @@ var cdCmd = &cobra.Command{
 				totalNum += 1
 				totalDocs = append(totalDocs, <-docChan)
 				if len(totalDocs) >= threshold {
-					err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
+					err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 					if err != nil {
 						atomic.StoreInt32(&gotErr, 1)
 						logger.Errorf("unable to ingest documents: %v", err)
@@ -167,7 +169,7 @@ var cdCmd = &cobra.Command{
 				}
 			}
 			if len(totalDocs) > 0 {
-				err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion)
+				err = ingestor.MergedIngest(ctx, totalDocs, opts.graphqlEndpoint, transport, csubClient, opts.queryVulnOnIngestion, opts.queryLicenseOnIngestion, opts.addVulnMetadata)
 				if err != nil {
 					atomic.StoreInt32(&gotErr, 1)
 					logger.Errorf("unable to ingest documents: %v", err)
@@ -236,6 +238,7 @@ func validateCDFlags(
 	queryLicenseIngestion bool,
 	certifierLatencyStr string,
 	batchSize int, lastScan int,
+	addVulnMetadata bool,
 ) (cdOptions, error) {
 	var opts cdOptions
 	opts.graphqlEndpoint = graphqlEndpoint
@@ -270,13 +273,16 @@ func validateCDFlags(
 	opts.csubClientOptions = csubOpts
 	opts.queryVulnOnIngestion = queryVulnIngestion
 	opts.queryLicenseOnIngestion = queryLicenseIngestion
+	opts.addVulnMetadata = addVulnMetadata
 
 	return opts, nil
 }
 
 func init() {
-	set, err := cli.BuildFlags([]string{"certifier-latency",
-		"certifier-batch-size", "last-scan"})
+	set, err := cli.BuildFlags([]string{
+		"certifier-latency",
+		"certifier-batch-size", "last-scan",
+	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to setup flag: %v", err)
 		os.Exit(1)

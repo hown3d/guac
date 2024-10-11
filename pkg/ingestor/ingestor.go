@@ -44,11 +44,12 @@ func Ingest(
 	csubClient csub_client.Client,
 	scanForVulns bool,
 	scanForLicense bool,
+	addVulnMetadata bool,
 ) (*helpers.AssemblerIngestedIDs, error) {
 	logger := d.ChildLogger
 	// Get pipeline of components
 	processorFunc := GetProcessor(ctx)
-	ingestorFunc := GetIngestor(ctx, scanForVulns, scanForLicense)
+	ingestorFunc := GetIngestor(ctx, scanForVulns, scanForLicense, addVulnMetadata)
 	collectSubEmitFunc := GetCollectSubEmit(ctx, csubClient)
 	assemblerFunc := GetAssembler(ctx, d.ChildLogger, graphqlEndpoint, transport)
 
@@ -87,17 +88,18 @@ func MergedIngest(
 	csubClient csub_client.Client,
 	scanForVulns bool,
 	scanForLicense bool,
+	addVulnMetadata bool,
 ) error {
 	logger := logging.FromContext(ctx)
 	// Get pipeline of components
 	processorFunc := GetProcessor(ctx)
-	ingestorFunc := GetIngestor(ctx, scanForVulns, scanForLicense)
+	ingestorFunc := GetIngestor(ctx, scanForVulns, scanForLicense, addVulnMetadata)
 	collectSubEmitFunc := GetCollectSubEmit(ctx, csubClient)
 	assemblerFunc := GetAssembler(ctx, logger, graphqlEndpoint, transport)
 
 	start := time.Now()
 
-	var predicates = make([]assembler.IngestPredicates, 1)
+	predicates := make([]assembler.IngestPredicates, 1)
 	totalPredicates := 0
 	var idstrings []*parser_common.IdentifierStrings
 	for _, d := range docs {
@@ -164,9 +166,9 @@ func GetProcessor(ctx context.Context) func(*processor.Document) (processor.Docu
 	}
 }
 
-func GetIngestor(ctx context.Context, scanForVulns bool, scanForLicense bool) func(processor.DocumentTree) ([]assembler.IngestPredicates, []*parser_common.IdentifierStrings, error) {
+func GetIngestor(ctx context.Context, scanForVulns, scanForLicense, addVulnMetadata bool) func(processor.DocumentTree) ([]assembler.IngestPredicates, []*parser_common.IdentifierStrings, error) {
 	return func(doc processor.DocumentTree) ([]assembler.IngestPredicates, []*parser_common.IdentifierStrings, error) {
-		return parser.ParseDocumentTree(ctx, doc, scanForVulns, scanForLicense)
+		return parser.ParseDocumentTree(ctx, doc, scanForVulns, scanForLicense, addVulnMetadata)
 	}
 }
 
